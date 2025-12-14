@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Egg Price Extrapolation Tool</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 30px; }
+        input, button { padding: 5px; margin: 5px; }
+        .result { margin-top: 20px; padding: 10px; border: 1px solid #ccc; background: #f9f9f9; }
+        .error { color: red; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Egg Price Extrapolation Tool</h1>
+    <p>Select a date from the calendar and the number of nearest data points to use.</p>
+    <form method="POST">
+        Date: <input type="date" name="date" required><br>
+        Number of points: <input type="number" name="n_points" min="2" max="120" value="5" required><br>
+        <button type="submit">Compute</button>
+    </form>
+
+    {% if error %}
+        <div class="error">{{ error }}</div>
+    {% endif %}
+
+    {% if result %}
+        <div class="result">
+            <p>Week value: {{ week_value | round(3) }}</p>
+            <p>Newton estimate: {{ result["Newton"] | round(4) }}</p>
+            <p>Lagrange estimate: {{ result["Lagrange"] | round(4) }}</p>
+        </div>
+    {% endif %}
+</body>
+</html>
