@@ -1,34 +1,99 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <title>Egg Price Extrapolation Tool</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 30px; }
-        input, button { padding: 5px; margin: 5px; }
-        .result { margin-top: 20px; padding: 10px; border: 1px solid #ccc; background: #f9f9f9; }
-        .error { color: red; margin-top: 10px; }
-    </style>
+<meta charset="UTF-8">
+<title>Egg Price Extrapolation Tool</title>
+
+<style>
+body { font-family: Arial; margin: 30px; }
+button { padding: 6px; margin: 5px; }
+.tab { display: none; }
+table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+th, td { border: 1px solid #aaa; padding: 6px; text-align: center; }
+.highlight { background-color: #fff3a0; }
+.calc-container { position: relative; min-height: 300px; }
+.calc-image { position: absolute; bottom: 0; right: 0; width: 180px; opacity: 0.85; }
+.info { margin-top: 10px; max-width: 700px; }
+</style>
+
+<script>
+function openTab(tab) {
+    document.querySelectorAll(".tab").forEach(t => t.style.display = "none");
+    document.getElementById(tab).style.display = "block";
+}
+</script>
 </head>
+
 <body>
-    <h1>Egg Price Extrapolation Tool</h1>
-    <p>Select a date from the calendar and the number of nearest data points to use.</p>
-    <form method="POST">
-        Date: <input type="date" name="date" required><br>
-        Number of points: <input type="number" name="n_points" min="2" max="120" value="5" required><br>
-        <button type="submit">Compute</button>
-    </form>
 
-    {% if error %}
-        <div class="error">{{ error }}</div>
-    {% endif %}
+<h1>Egg Price Extrapolation Tool (August 2023 – November 2025)</h1>
 
-    {% if result %}
-        <div class="result">
-            <p>Week value: {{ week_value | round(3) }}</p>
-            <p>Newton estimate: {{ result["Newton"] | round(4) }}</p>
-            <p>Lagrange estimate: {{ result["Lagrange"] | round(4) }}</p>
-        </div>
-    {% endif %}
+<button onclick="openTab('calc')">Calculator</button>
+<button onclick="openTab('data')">Data Points</button>
+<button onclick="openTab('history')">History</button>
+
+<!-- Calculator -->
+<div id="calc" class="tab calc-container" style="display:block;">
+<p class="info">
+This tool estimates weekly egg prices for a selected date using numerical interpolation
+(Newton and Lagrange methods) based on official historical weekly price data.
+</p>
+
+<form method="POST">
+    Date: <input type="date" name="date" required>
+    Points: <input type="number" name="n_points" min="2" value="5">
+    <button type="submit">Compute</button>
+</form>
+
+{% if result %}
+<p><b>Week value:</b> {{ week_value | round(3) }}</p>
+<p><b>Newton:</b> {{ result[0] | round(4) }}</p>
+<p><b>Lagrange:</b> {{ result[1] | round(4) }}</p>
+{% endif %}
+
+<img src="/static/egg.jpg" class="calc-image">
+</div>
+
+<!-- Data Points -->
+<div id="data" class="tab">
+<p><b>Highlighted rows indicate the data points used in the interpolation.</b></p>
+<table>
+<tr>
+    <th>Week No.</th>
+    <th>Date Range</th>
+    <th>Price</th>
+</tr>
+{% for row in data_table %}
+<tr class="{% if row.week in selected_weeks %}highlight{% endif %}">
+    <td>Week {{ row.week }}</td>
+    <td>{{ row.range }}</td>
+    <td>{{ row.price }}</td>
+</tr>
+{% endfor %}
+</table>
+</div>
+
+<!-- History -->
+<div id="history" class="tab">
+<table>
+<tr>
+    <th>Date</th>
+    <th>Week</th>
+    <th>Points</th>
+    <th>Newton</th>
+    <th>Lagrange</th>
+</tr>
+{% for h in history %}
+<tr>
+    <td>{{ h.date }}</td>
+    <td>{{ h.week }}</td>
+    <td>{{ h.points }}</td>
+    <td>{{ h.newton }}</td>
+    <td>{{ h.lagrange }}</td>
+</tr>
+{% endfor %}
+</table>
+</div>
+
 </body>
 </html>
