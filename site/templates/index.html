@@ -40,8 +40,17 @@ This tool estimates weekly egg prices for a selected date using numerical interp
 </p>
 
 <form method="POST">
-    Date: <input type="date" name="date" required>
-    Points: <input type="number" name="n_points" min="2" value="5">
+    Date:
+    <input type="date" name="date" required>
+
+    Points:
+    <input type="number"
+           name="n_points"
+           min="2"
+           max="119"
+           value="2"
+           required>
+
     <button type="submit">Compute</button>
 </form>
 

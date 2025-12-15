@@ -1,10 +1,11 @@
 from flask import Flask, render_template, request
-from datetime import date, datetime
+from datetime import datetime, date, timedelta
 import bisect
 
 app = Flask(__name__)
 
 BASE_WEEK1_MONDAY = date(2023, 8, 21)
+MAX_POINTS = 119
 
 weekly_prices = [
     7.29, 7.23, 7.25, 7.34, 7.56, 7.64, 7.73, 7.87, 7.88, 7.96,
@@ -21,97 +22,122 @@ weekly_prices = [
     8.32, 8.37, 8.35, 8.33, 8.32, 8.33, 8.34, 8.31, 8.29
 ]
 
-history_log = []
+history = []
+
 
 def date_to_fractional_week(d):
     delta_days = (d - BASE_WEEK1_MONDAY).days
     if delta_days < 0:
-        raise ValueError("Date is before Week 1")
-    return delta_days // 7 + 1 + (delta_days % 7) / 7
+        raise ValueError("Date is before Week 1.")
+    week = delta_days // 7 + 1
+    day = delta_days % 7
+    return week + day / 7.0
+
 
 def build_xy(prices):
-    return [i + 1 for i in range(len(prices))], prices[:]
+    x = [float(i + 1) for i in range(len(prices))]
+    y = [float(p) for p in prices]
+    return x, y
 
-def newton_interpolation(x, y, t):
+
+def newton_interpolation(x, y, target_x):
     n = len(x)
-    table = [[0]*n for _ in range(n)]
+    table = [[0.0] * n for _ in range(n)]
     for i in range(n):
         table[i][0] = y[i]
     for j in range(1, n):
         for i in range(n - j):
-            table[i][j] = (table[i+1][j-1] - table[i][j-1]) / (x[i+j] - x[i])
-    result, prod = table[0][0], 1
+            table[i][j] = (table[i + 1][j - 1] - table[i][j - 1]) / (x[i + j] - x[i])
+    result = table[0][0]
+    prod = 1.0
     for j in range(1, n):
-        prod *= (t - x[j-1])
+        prod *= (target_x - x[j - 1])
         result += table[0][j] * prod
     return result
 
-def lagrange_interpolation(x, y, t):
-    total = 0
-    for i in range(len(x)):
-        Li = 1
-        for j in range(len(x)):
+
+def lagrange_interpolation(x, y, target_x):
+    total = 0.0
+    n = len(x)
+    for i in range(n):
+        Li = 1.0
+        for j in range(n):
             if i != j:
-                Li *= (t - x[j]) / (x[i] - x[j])
+                Li *= (target_x - x[j]) / (x[i] - x[j])
         total += y[i] * Li
     return total
 
-def nearest_points(x, y, t, n):
-    pos = bisect.bisect_left(x, t)
-    pairs = list(zip(x[max(0, pos-n):pos+n], y[max(0, pos-n):pos+n]))
-    pairs.sort(key=lambda p: abs(p[0]-t))
+
+def nearest_points(x_all, y_all, target_x, n):
+    pos = bisect.bisect_left(x_all, target_x)
+    left = max(0, pos - n)
+    right = min(len(x_all), pos + n)
+    pairs = list(zip(x_all[left:right], y_all[left:right]))
+    pairs.sort(key=lambda p: abs(p[0] - target_x))
     pairs = sorted(pairs[:n], key=lambda p: p[0])
     return [p[0] for p in pairs], [p[1] for p in pairs]
 
+
+def build_data_table():
+    table = []
+    for i, price in enumerate(weekly_prices):
+        start = BASE_WEEK1_MONDAY + timedelta(weeks=i)
+        end = start + timedelta(days=4)
+        table.append({
+            "week": i + 1,
+            "range": f"{start.strftime('%b %d, %Y')} - {end.strftime('%b %d, %Y')}",
+            "price": f"{price:.2f}"
+        })
+    return table
+
+
 @app.route("/", methods=["GET", "POST"])
 def index():
-    selected_weeks, result, week_value, error = [], None, None, None
+    result = None
+    week_value = None
+    error = None
+    selected_weeks = []
 
     if request.method == "POST":
         try:
             d = datetime.strptime(request.form["date"], "%Y-%m-%d").date()
             n = int(request.form["n_points"])
-            t = date_to_fractional_week(d)
 
-            x, y = build_xy(weekly_prices)
-            xs, ys = nearest_points(x, y, t, n)
+            if n < 2 or n > MAX_POINTS:
+                raise ValueError("Data points must be between 2 and 119.")
 
-            selected_weeks = xs[:]
-            newton = newton_interpolation(xs, ys, t)
-            lagrange = lagrange_interpolation(xs, ys, t)
+            target_x = date_to_fractional_week(d)
+            x_all, y_all = build_xy(weekly_prices)
+            x_sel, y_sel = nearest_points(x_all, y_all, target_x, n)
 
-            history_log.append({
+            newton_val = newton_interpolation(x_sel, y_sel, target_x)
+            lag_val = lagrange_interpolation(x_sel, y_sel, target_x)
+
+            result = (newton_val, lag_val)
+            week_value = target_x
+            selected_weeks = [int(x) for x in x_sel]
+
+            history.append({
                 "date": d.strftime("%Y-%m-%d"),
-                "week": round(t, 3),
+                "week": round(target_x, 3),
                 "points": n,
-                "newton": round(newton, 4),
-                "lagrange": round(lagrange, 4)
+                "newton": round(newton_val, 4),
+                "lagrange": round(lag_val, 4)
             })
 
-            result, week_value = (newton, lagrange), t
         except Exception as e:
             error = str(e)
-
-    data_table = []
-    for i in range(len(weekly_prices)):
-        start = BASE_WEEK1_MONDAY + timedelta(days=i*7)
-        end = start + timedelta(days=4)
-        data_table.append({
-            "week": i+1,
-            "price": weekly_prices[i],
-            "range": f"{start.strftime('%b %d %Y')} – {end.strftime('%b %d %Y')}"
-        })
 
     return render_template(
         "index.html",
         result=result,
         week_value=week_value,
         error=error,
-        history=history_log,
-        data_table=data_table,
-        selected_weeks=selected_weeks
+        data_table=build_data_table(),
+        selected_weeks=selected_weeks,
+        history=history
     )
 
+
 if __name__ == "__main__":
-    from datetime import timedelta
     app.run(debug=True)
