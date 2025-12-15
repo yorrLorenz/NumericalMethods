@@ -1,0 +1,6 @@
+How to run: 
+1. Download the Entire Folder.
+2. Have python installed in your machine.
+3. Type in terminal " pip install flask ".
+4. Run the App.py Code.
+5. Type http://127.0.0.1:5000/ on any browser to open the site.
